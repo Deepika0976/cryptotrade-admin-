@@ -8,252 +8,260 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#08111f;color:#edf4ff;font:15px Arial,sans-serif}
-main{max-width:1000px;margin:auto;padding:18px}
+body{margin:0;background:#08111f;color:#eaf2ff;font:16px Arial,sans-serif}
+main{max-width:900px;margin:30px auto;padding:16px}
 h1{color:#69aaff}
-.card{background:#111e30;border:1px solid #263b55;border-radius:14px;padding:20px;margin:16px 0}
-input,button{width:100%;padding:12px;margin:7px 0;border-radius:8px;border:1px solid #344a65;background:#091626;color:white}
-button{background:#1677e8;border:0;font-weight:bold;cursor:pointer}
-button.secondary{background:#263b55}
+.card{background:#111e30;border:1px solid #2a405c;border-radius:16px;padding:22px;margin:18px 0}
+input,button{width:100%;padding:13px;margin:7px 0;border-radius:9px;font-size:16px}
+input{background:#091626;color:white;border:1px solid #344b68}
+button{background:#1976e8;color:white;border:0;font-weight:bold;cursor:pointer}
+button.secondary{background:#2b405c}
 button:disabled{opacity:.5}
-.hidden{display:none}
-small{color:#a8bad0}
-.tablebox{overflow:auto}
-table{width:100%;border-collapse:collapse;min-width:480px}
-th,td{text-align:left;padding:11px;border-bottom:1px solid #263b55}
-.status{white-space:pre-wrap;color:#77e0bd;overflow-wrap:anywhere}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
-.stat{padding:15px;background:#091626;border-radius:10px}
+small,.muted{color:#a9bad0}
+#app{display:none}
+#status{padding:12px;overflow-wrap:anywhere}
+table{width:100%;border-collapse:collapse;min-width:430px}
+th,td{text-align:left;padding:12px;border-bottom:1px solid #293c55}
+.tablewrap{overflow-x:auto}
+label{display:block;margin-top:12px}
 </style>
 </head>
 <body>
 <main>
 <h1>CryptoTrade</h1>
-<p><small>ADMINISTRATION PORTAL</small></p>
+<p class="muted">ADMINISTRATION PORTAL</p>
 
-<section id="login" class="card">
+<section class="card" id="login">
 <h2>Admin Login</h2>
+<label>Admin Email</label>
 <input id="email" type="email" placeholder="Admin email" autocomplete="username">
-<input id="password" type="password" placeholder="Password" autocomplete="current-password">
+<label>Password</label>
+<input id="password" type="password" placeholder="Admin password" autocomplete="current-password">
 <button id="loginBtn" onclick="login()">Sign In</button>
-<p id="loginStatus" class="status"></p>
+<div id="loginStatus"></div>
 </section>
 
-<section id="panel" class="hidden">
-<div class="card">
+<div id="app">
+<section class="card">
 <h2>Dashboard</h2>
-<p id="welcome"></p>
-<div class="stats">
-<div class="stat"><small>Users Loaded</small><h2 id="userCount">0</h2></div>
-<div class="stat"><small>Admin Status</small><h3>Verified</h3></div>
-</div>
+<p>Signed in: <span id="signedIn"></span></p>
+<p>Admin Status: <b id="adminStatus">Checking...</b></p>
+<p>Total Users: <b id="total">0</b></p>
 <button onclick="loadUsers()">Refresh Users</button>
 <button class="secondary" onclick="logout()">Sign Out</button>
-<p id="mainStatus" class="status"></p>
-</div>
+</section>
 
-<div class="card">
+<section class="card">
+<h2>Create User Account</h2>
+<p class="muted">Username must be 3–30 letters, numbers, or underscores. Password must contain at least 8 characters.</p>
+<label>Username</label>
+<input id="newUsername" placeholder="Example: user5002" maxlength="30" autocomplete="off">
+<label>Password</label>
+<input id="newPassword" type="password" placeholder="Set a strong password" autocomplete="new-password">
+<button id="createBtn" onclick="createUser()">Create User</button>
+<div id="createStatus"></div>
+</section>
+
+<section class="card">
 <h2>User Management</h2>
-<input id="search" placeholder="Search by username or ID" oninput="showUsers()">
-<div class="tablebox">
+<input id="search" placeholder="Search by User ID or Username" oninput="renderUsers()">
+<div class="tablewrap">
 <table>
 <thead><tr><th>User ID</th><th>Username</th><th>Created</th></tr></thead>
-<tbody id="users"></tbody>
+<tbody id="usersBody"><tr><td colspan="3">Loading users...</td></tr></tbody>
 </table>
 </div>
-</div>
-
-<div class="card">
-<h2>Balance Management</h2>
-<input id="balanceUser" type="number" min="5001" step="1" placeholder="User ID">
-<input id="balanceAmount" type="number" min="0.01" step="0.01" placeholder="Amount">
-<input id="balanceReason" maxlength="300" placeholder="Reason for adjustment">
-<button onclick="adjustBalance('add')">Add Balance</button>
-<button onclick="adjustBalance('remove')">Remove Balance</button>
-<p id="balanceStatus" class="status"></p>
-</div>
-
-<div class="card">
-<h2>Account Messages</h2>
-<p>Message sending will be enabled after its secure backend is configured.</p>
-</div>
-
-<div class="card">
-<h2>Invite Codes</h2>
-<p>Invite code creation and redemption will be enabled after its secure backend is configured.</p>
-</div>
 </section>
+</div>
+<div id="status"></div>
 </main>
 
 <script>
 const SUPABASE_URL = "https://pgmknttganaruiwqyfwq.supabase.co";
 const SUPABASE_KEY = "sb_publishable_J5AaqG44SVQSh8ggcHouig_W79XKN5s";
+
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
 let users = [];
-let busy = false;
 
-function setText(id, text) {
-  document.getElementById(id).textContent = text;
-}
-
-function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, c => ({
-    "&":"&amp;",
-    "<":"&lt;",
-    ">":"&gt;",
-    '"':"&quot;",
-    "'":"&#39;"
-  })[c]);
+function message(id, text, good=false) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.style.color = good ? "#5fe0b7" : "#ff9aab";
 }
 
 async function login() {
-  if (busy) return;
-  busy = true;
-  document.getElementById("loginBtn").disabled = true;
-  setText("loginStatus", "Signing in...");
-
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  const btn = document.getElementById("loginBtn");
+  if (!email || !password) {
+    message("loginStatus", "Enter your admin email and password.");
+    return;
+  }
+  btn.disabled = true;
+  message("loginStatus", "Signing in...");
   try {
-    const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value;
-
-    if (!email || !password) {
-      throw new Error("Enter your admin email and password.");
-    }
-
-    const { error } = await db.auth.signInWithPassword({ email, password });
+    const { error } = await db.auth.signInWithPassword({email, password});
     if (error) throw error;
-
     await checkAdmin();
   } catch (e) {
-    setText("loginStatus", "Login failed: " + e.message);
+    message("loginStatus", e.message || "Login failed.");
   } finally {
-    busy = false;
-    document.getElementById("loginBtn").disabled = false;
+    btn.disabled = false;
   }
 }
 
 async function checkAdmin() {
-  const { data: result, error: authError } = await db.auth.getUser();
-
-  if (authError || !result.user) {
-    document.getElementById("login").classList.remove("hidden");
-    document.getElementById("panel").classList.add("hidden");
+  const { data: sessionData, error: sessionError } = await db.auth.getSession();
+  if (sessionError || !sessionData.session) {
+    document.getElementById("login").style.display = "block";
+    document.getElementById("app").style.display = "none";
     return;
   }
 
+  const user = sessionData.session.user;
+  document.getElementById("signedIn").textContent = user.email || "Admin";
   const { data, error } = await db.rpc("is_admin");
 
   if (error || data !== true) {
     await db.auth.signOut();
-    throw new Error("Admin access verification failed. Check the admin_users table and is_admin function.");
+    document.getElementById("app").style.display = "none";
+    document.getElementById("login").style.display = "block";
+    message("loginStatus", "This account is not authorized as an administrator.");
+    return;
   }
 
-  document.getElementById("login").classList.add("hidden");
-  document.getElementById("panel").classList.remove("hidden");
-  setText("welcome", "Signed in: " + result.user.email);
-  setText("loginStatus", "");
-
+  document.getElementById("login").style.display = "none";
+  document.getElementById("app").style.display = "block";
+  document.getElementById("adminStatus").textContent = "Verified";
+  message("loginStatus", "");
   await loadUsers();
 }
 
 async function loadUsers() {
-  setText("mainStatus", "Loading users...");
+  document.getElementById("usersBody").innerHTML =
+    '<tr><td colspan="3">Loading...</td></tr>';
 
   const { data, error } = await db
     .from("profiles")
     .select("id, username, created_at")
-    .order("id", { ascending: true })
-    .limit(500);
+    .order("id", {ascending:true});
 
   if (error) {
-    setText("mainStatus", "Could not load users: " + error.message);
+    document.getElementById("usersBody").innerHTML =
+      '<tr><td colspan="3">Could not load users.</td></tr>';
+    message("status", "User list error: " + error.message);
     return;
   }
 
   users = data || [];
-  showUsers();
-  setText("userCount", String(users.length));
-  setText("mainStatus", "User list refreshed.");
+  document.getElementById("total").textContent = users.length;
+  renderUsers();
+  message("status", "User list refreshed.", true);
 }
 
-function showUsers() {
+function renderUsers() {
   const q = document.getElementById("search").value.trim().toLowerCase();
   const filtered = users.filter(u =>
     String(u.id).includes(q) ||
     String(u.username).toLowerCase().includes(q)
   );
 
-  document.getElementById("users").innerHTML = filtered.map(u => `
-    <tr>
-      <td>${escapeHtml(u.id)}</td>
-      <td>${escapeHtml(u.username)}</td>
-      <td>${escapeHtml(u.created_at || "")}</td>
-    </tr>
-  `).join("") || '<tr><td colspan="3">No users found.</td></tr>';
-}
-
-async function adjustBalance(action) {
-  if (busy) return;
-
-  const id = Number(document.getElementById("balanceUser").value);
-  const amount = Number(document.getElementById("balanceAmount").value);
-  const reason = document.getElementById("balanceReason").value.trim();
-
-  if (!Number.isSafeInteger(id) || id < 5001 ||
-      !Number.isFinite(amount) || amount <= 0 ||
-      !reason || reason.length < 3) {
-    setText("balanceStatus", "Enter a valid User ID, positive amount, and reason (at least 3 characters).");
+  const body = document.getElementById("usersBody");
+  if (!filtered.length) {
+    body.innerHTML = '<tr><td colspan="3">No users found.</td></tr>';
     return;
   }
 
-  const confirmed = confirm(
-    "Confirm " + action + " of " + amount.toFixed(2) +
-    " for User ID " + id + "?"
-  );
-  if (!confirmed) return;
+  body.innerHTML = filtered.map(u => {
+    const date = u.created_at
+      ? new Date(u.created_at).toLocaleString()
+      : "—";
+    return `<tr>
+      <td>${escapeHtml(u.id)}</td>
+      <td>${escapeHtml(u.username)}</td>
+      <td>${escapeHtml(date)}</td>
+    </tr>`;
+  }).join("");
+}
 
-  busy = true;
-  setText("balanceStatus", "Processing...");
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;", "<":"&lt;", ">":"&gt;",
+    '"':"&quot;", "'":"&#39;"
+  }[c]));
+}
+
+async function createUser() {
+  const username = document.getElementById("newUsername").value.trim().toLowerCase();
+  const password = document.getElementById("newPassword").value;
+  const btn = document.getElementById("createBtn");
+
+  if (!/^[a-z0-9_]{3,30}$/.test(username)) {
+    message("createStatus", "Username must be 3–30 letters, numbers, or underscores.");
+    return;
+  }
+  if (password.length < 8 || password.length > 72) {
+    message("createStatus", "Password must be 8–72 characters.");
+    return;
+  }
+
+  btn.disabled = true;
+  message("createStatus", "Creating account...");
+
   try {
-    const { data: sessionData } = await db.auth.getSession();
-    if (!sessionData.session) throw new Error("Please sign in again.");
-
-    const { data, error } = await db.rpc("admin_adjust_balance", {
-      p_user_id: id,
-      p_action: action,
-      p_amount: amount,
-      p_reason: reason
+    const { data, error } = await db.functions.invoke("smart-handler", {
+      body: { username, password }
     });
 
-    if (error) throw error;
+    if (error) {
+      let details = error.message || "Function request failed.";
+      try {
+        if (error.context && typeof error.context.json === "function") {
+          const body = await error.context.json();
+          if (body.error) details = body.error;
+        }
+      } catch {}
+      throw new Error(details);
+    }
 
-    setText("balanceStatus", "Balance updated. New balance: " + data);
-    document.getElementById("balanceAmount").value = "";
-    document.getElementById("balanceReason").value = "";
+    if (!data || !data.success) {
+      throw new Error(data?.error || "Account creation failed.");
+    }
+
+    message(
+      "createStatus",
+      "Created successfully. User ID: " + data.user_id +
+      " | Username: " + data.username,
+      true
+    );
+    document.getElementById("newUsername").value = "";
+    document.getElementById("newPassword").value = "";
+    await loadUsers();
   } catch (e) {
-    setText("balanceStatus", "Balance update failed: " + e.message);
+    message("createStatus", e.message || "Could not create user.");
   } finally {
-    busy = false;
+    btn.disabled = false;
   }
 }
 
 async function logout() {
   await db.auth.signOut();
   users = [];
-  document.getElementById("panel").classList.add("hidden");
-  document.getElementById("login").classList.remove("hidden");
-  setText("loginStatus", "Signed out.");
+  document.getElementById("app").style.display = "none";
+  document.getElementById("login").style.display = "block";
+  message("loginStatus", "Signed out.", true);
 }
 
-db.auth.onAuthStateChange((event) => {
-  if (event === "SIGNED_OUT") {
-    document.getElementById("panel").classList.add("hidden");
-    document.getElementById("login").classList.remove("hidden");
+db.auth.onAuthStateChange((event, session) => {
+  if (event === "SIGNED_OUT" || !session) {
+    document.getElementById("app").style.display = "none";
   }
 });
 
-checkAdmin().catch(e => setText("loginStatus", e.message));
+(async () => {
+  const { data } = await db.auth.getSession();
+  if (data.session) await checkAdmin();
+})();
 </script>
 </body>
 </html>
