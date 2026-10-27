@@ -4,70 +4,85 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CryptoTrade Admin</title>
+<title>CryptoTrade Admin Panel</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
+*{box-sizing:border-box}
 body{margin:0;background:#08111f;color:#edf4ff;font:15px Arial,sans-serif}
-main{max-width:1000px;margin:30px auto;padding:18px}
-.card{background:#111e30;border:1px solid #263b55;border-radius:14px;padding:20px;margin:15px 0}
-input,button{box-sizing:border-box;width:100%;padding:12px;margin:6px 0;border-radius:8px;border:1px solid #344a65;background:#091626;color:white}
-button{background:#1677e8;border:0;font-weight:bold}
+main{max-width:1000px;margin:auto;padding:18px}
+h1{color:#69aaff}
+.card{background:#111e30;border:1px solid #263b55;border-radius:14px;padding:20px;margin:16px 0}
+input,button{width:100%;padding:12px;margin:7px 0;border-radius:8px;border:1px solid #344a65;background:#091626;color:white}
+button{background:#1677e8;border:0;font-weight:bold;cursor:pointer}
+button.secondary{background:#263b55}
 button:disabled{opacity:.5}
 .hidden{display:none}
 small{color:#a8bad0}
-table{width:100%;border-collapse:collapse;min-width:500px}
-th,td{text-align:left;padding:10px;border-bottom:1px solid #263b55}
 .tablebox{overflow:auto}
-#status{white-space:pre-wrap;color:#77e0bd}
+table{width:100%;border-collapse:collapse;min-width:480px}
+th,td{text-align:left;padding:11px;border-bottom:1px solid #263b55}
+.status{white-space:pre-wrap;color:#77e0bd;overflow-wrap:anywhere}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat{padding:15px;background:#091626;border-radius:10px}
 </style>
 </head>
 <body>
 <main>
-  <h1>CryptoTrade</h1>
-  <p><small>Secure Admin Panel</small></p>
+<h1>CryptoTrade</h1>
+<p><small>ADMINISTRATION PORTAL</small></p>
 
-  <section id="login" class="card">
-    <h2>Admin Login</h2>
-    <input id="email" type="email" placeholder="Admin email">
-    <input id="password" type="password" placeholder="Password">
-    <button id="loginBtn" onclick="login()">Sign In</button>
-    <p id="status"></p>
-  </section>
+<section id="login" class="card">
+<h2>Admin Login</h2>
+<input id="email" type="email" placeholder="Admin email" autocomplete="username">
+<input id="password" type="password" placeholder="Password" autocomplete="current-password">
+<button id="loginBtn" onclick="login()">Sign In</button>
+<p id="loginStatus" class="status"></p>
+</section>
 
-  <section id="panel" class="hidden">
-    <div class="card">
-      <h2>Dashboard</h2>
-      <p id="welcome">Checking administrator access...</p>
-      <button onclick="loadUsers()">Refresh Users</button>
-      <button onclick="logout()">Sign Out</button>
-    </div>
+<section id="panel" class="hidden">
+<div class="card">
+<h2>Dashboard</h2>
+<p id="welcome"></p>
+<div class="stats">
+<div class="stat"><small>Users Loaded</small><h2 id="userCount">0</h2></div>
+<div class="stat"><small>Admin Status</small><h3>Verified</h3></div>
+</div>
+<button onclick="loadUsers()">Refresh Users</button>
+<button class="secondary" onclick="logout()">Sign Out</button>
+<p id="mainStatus" class="status"></p>
+</div>
 
-    <div class="card">
-      <h2>User Management</h2>
-      <input id="search" placeholder="Search username or user ID"
-             oninput="showUsers()">
-      <div class="tablebox">
-        <table>
-          <thead><tr>
-            <th>User ID</th><th>Username</th><th>Created</th>
-          </tr></thead>
-          <tbody id="users"></tbody>
-        </table>
-      </div>
-    </div>
+<div class="card">
+<h2>User Management</h2>
+<input id="search" placeholder="Search by username or ID" oninput="showUsers()">
+<div class="tablebox">
+<table>
+<thead><tr><th>User ID</th><th>Username</th><th>Created</th></tr></thead>
+<tbody id="users"></tbody>
+</table>
+</div>
+</div>
 
-    <div class="card">
-      <h2>Balance Management</h2>
-      <p><small>Enter an existing User ID. Changes require administrator access.</small></p>
-      <input id="balanceUser" type="number" placeholder="User ID">
-      <input id="balanceAmount" type="number" min="0.01" step="0.01"
-             placeholder="Amount">
-      <input id="balanceReason" placeholder="Reason for adjustment">
-      <button onclick="adjustBalance('add')">Add Balance</button>
-      <button onclick="adjustBalance('remove')">Remove Balance</button>
-    </div>
-    <p id="statusPanel"></p>
-  </section>
+<div class="card">
+<h2>Balance Management</h2>
+<input id="balanceUser" type="number" min="5001" step="1" placeholder="User ID">
+<input id="balanceAmount" type="number" min="0.01" step="0.01" placeholder="Amount">
+<input id="balanceReason" maxlength="300" placeholder="Reason for adjustment">
+<button onclick="adjustBalance('add')">Add Balance</button>
+<button onclick="adjustBalance('remove')">Remove Balance</button>
+<p id="balanceStatus" class="status"></p>
+</div>
+
+<div class="card">
+<h2>Account Messages</h2>
+<p>Message sending will be enabled after its secure backend is configured.</p>
+</div>
+
+<div class="card">
+<h2>Invite Codes</h2>
+<p>Invite code creation and redemption will be enabled after its secure backend is configured.</p>
+</div>
+</section>
 </main>
 
 <script>
@@ -78,22 +93,40 @@ const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let users = [];
 let busy = false;
 
-function message(text, panel = false) {
-  document.getElementById(panel ? "statusPanel" : "status").textContent = text;
+function setText(id, text) {
+  document.getElementById(id).textContent = text;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#39;"
+  })[c]);
 }
 
 async function login() {
   if (busy) return;
   busy = true;
   document.getElementById("loginBtn").disabled = true;
+  setText("loginStatus", "Signing in...");
+
   try {
     const email = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value;
+
+    if (!email || !password) {
+      throw new Error("Enter your admin email and password.");
+    }
+
     const { error } = await db.auth.signInWithPassword({ email, password });
     if (error) throw error;
+
     await checkAdmin();
   } catch (e) {
-    message("Login failed: " + e.message);
+    setText("loginStatus", "Login failed: " + e.message);
   } finally {
     busy = false;
     document.getElementById("loginBtn").disabled = false;
@@ -101,28 +134,32 @@ async function login() {
 }
 
 async function checkAdmin() {
-  const { data: { user }, error: userError } = await db.auth.getUser();
-  if (userError || !user) {
+  const { data: result, error: authError } = await db.auth.getUser();
+
+  if (authError || !result.user) {
     document.getElementById("login").classList.remove("hidden");
     document.getElementById("panel").classList.add("hidden");
     return;
   }
 
   const { data, error } = await db.rpc("is_admin");
+
   if (error || data !== true) {
     await db.auth.signOut();
-    throw new Error("This account is not authorized as an administrator.");
+    throw new Error("Admin access verification failed. Check the admin_users table and is_admin function.");
   }
 
   document.getElementById("login").classList.add("hidden");
   document.getElementById("panel").classList.remove("hidden");
-  document.getElementById("welcome").textContent =
-    "Signed in as " + user.email + " — administrator verified.";
+  setText("welcome", "Signed in: " + result.user.email);
+  setText("loginStatus", "");
+
   await loadUsers();
 }
 
 async function loadUsers() {
-  message("Loading users...", true);
+  setText("mainStatus", "Loading users...");
+
   const { data, error } = await db
     .from("profiles")
     .select("id, username, created_at")
@@ -130,23 +167,24 @@ async function loadUsers() {
     .limit(500);
 
   if (error) {
-    message("Could not load users: " + error.message, true);
+    setText("mainStatus", "Could not load users: " + error.message);
     return;
   }
 
   users = data || [];
   showUsers();
-  message("Loaded " + users.length + " user records.", true);
+  setText("userCount", String(users.length));
+  setText("mainStatus", "User list refreshed.");
 }
 
 function showUsers() {
-  const q = document.getElementById("search").value.toLowerCase();
-  const rows = users.filter(u =>
+  const q = document.getElementById("search").value.trim().toLowerCase();
+  const filtered = users.filter(u =>
     String(u.id).includes(q) ||
     String(u.username).toLowerCase().includes(q)
   );
 
-  document.getElementById("users").innerHTML = rows.map(u => `
+  document.getElementById("users").innerHTML = filtered.map(u => `
     <tr>
       <td>${escapeHtml(u.id)}</td>
       <td>${escapeHtml(u.username)}</td>
@@ -155,47 +193,67 @@ function showUsers() {
   `).join("") || '<tr><td colspan="3">No users found.</td></tr>';
 }
 
-function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, c => ({
-    "&":"&amp;", "<":"&lt;", ">":"&gt;",
-    '"':"&quot;", "'":"&#39;"
-  })[c]);
-}
-
 async function adjustBalance(action) {
+  if (busy) return;
+
   const id = Number(document.getElementById("balanceUser").value);
   const amount = Number(document.getElementById("balanceAmount").value);
   const reason = document.getElementById("balanceReason").value.trim();
 
   if (!Number.isSafeInteger(id) || id < 5001 ||
-      !Number.isFinite(amount) || amount <= 0 || !reason) {
-    message("Enter a valid User ID, positive amount and reason.", true);
+      !Number.isFinite(amount) || amount <= 0 ||
+      !reason || reason.length < 3) {
+    setText("balanceStatus", "Enter a valid User ID, positive amount, and reason (at least 3 characters).");
     return;
   }
 
-  message("Balance adjustment is not enabled yet.", true);
-  message(
-    "For safety, balance changes require a transaction-safe database function " +
-    "and an audit log. These must be installed and tested before this action is enabled.",
-    true
+  const confirmed = confirm(
+    "Confirm " + action + " of " + amount.toFixed(2) +
+    " for User ID " + id + "?"
   );
+  if (!confirmed) return;
+
+  busy = true;
+  setText("balanceStatus", "Processing...");
+  try {
+    const { data: sessionData } = await db.auth.getSession();
+    if (!sessionData.session) throw new Error("Please sign in again.");
+
+    const { data, error } = await db.rpc("admin_adjust_balance", {
+      p_user_id: id,
+      p_action: action,
+      p_amount: amount,
+      p_reason: reason
+    });
+
+    if (error) throw error;
+
+    setText("balanceStatus", "Balance updated. New balance: " + data);
+    document.getElementById("balanceAmount").value = "";
+    document.getElementById("balanceReason").value = "";
+  } catch (e) {
+    setText("balanceStatus", "Balance update failed: " + e.message);
+  } finally {
+    busy = false;
+  }
 }
 
 async function logout() {
   await db.auth.signOut();
+  users = [];
   document.getElementById("panel").classList.add("hidden");
   document.getElementById("login").classList.remove("hidden");
-  message("You have signed out.");
+  setText("loginStatus", "Signed out.");
 }
 
-db.auth.onAuthStateChange((event, session) => {
-  if (event === "SIGNED_OUT" || !session) {
+db.auth.onAuthStateChange((event) => {
+  if (event === "SIGNED_OUT") {
     document.getElementById("panel").classList.add("hidden");
     document.getElementById("login").classList.remove("hidden");
   }
 });
 
-checkAdmin().catch(e => message(e.message));
+checkAdmin().catch(e => setText("loginStatus", e.message));
 </script>
 </body>
 </html>
